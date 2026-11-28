@@ -1,19 +1,20 @@
 """CLI image interpreter for DrawGram shape-to-command drawings."""
 
 import argparse
-from typing import Dict
+from pathlib import Path
+from typing import Dict, Iterable, Any
 import cv2
 
 from drawgram_core import ALLOWED_COMMANDS, detect_shapes, get_command
 
 
-def run_commands(shapes) -> Dict[str, object]:
+def run_commands(shapes: Iterable[Any]) -> Dict[str, object]:
     """Execute recognized shape commands safely without raw exec()."""
     variables: Dict[str, object] = {}
     for shape in shapes:
         cmd = get_command(shape)
         handler = ALLOWED_COMMANDS.get(cmd) if cmd else None
-        if handler:
+        if callable(handler):
             print(f"Running: {cmd}")
             handler(variables)
 
@@ -22,19 +23,25 @@ def run_commands(shapes) -> Dict[str, object]:
     return variables
 
 
-def main(image_path: str = "test.png") -> None:
+def main(image_path: str = "test.png") -> int:
     """Load an image file, detect shapes, and run mapped commands."""
-    img = cv2.imread(image_path)
+    path = Path(image_path)
+    if not path.is_file():
+        print(f"Error: Image file not found at '{path}'.")
+        return 1
+
+    img = cv2.imread(str(path))
     if img is None:
-        print(f"Error: Could not load image '{image_path}'.")
-        return
+        print(f"Error: Could not decode image '{path}'.")
+        return 1
 
     shapes = detect_shapes(img)
     run_commands(shapes)
+    return 0
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interpret shapes in a DrawGram image.")
     parser.add_argument("image", nargs="?", default="test.png", help="Path to input image")
     args = parser.parse_args()
-    main(args.image)
+    raise SystemExit(main(args.image))
